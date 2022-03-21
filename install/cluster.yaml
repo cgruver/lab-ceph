@@ -80,7 +80,7 @@ spec:
     useAllNodes: false
     useAllDevices: false
     config:
-    nodes: []
+      nodes:
   disruptionManagement:
     managePodBudgets: false
     osdMaintenanceTimeout: 30

@@ -79,7 +79,6 @@ spec:
   storage:
     useAllNodes: false
     useAllDevices: false
-    config:
   disruptionManagement:
     managePodBudgets: false
     osdMaintenanceTimeout: 30

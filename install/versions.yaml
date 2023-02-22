@@ -1,8 +1,8 @@
 cephcsi: v3.7.2
-csi-node-driver-registrar: v2.5.1
-csi-resizer: v1.6.0
-csi-provisioner: v3.3.0
-csi-snapshotter: v6.1.0
-csi-attacher: v4.0.0
-rook-ceph: v1.10.4
-ceph: v17.2.3
+csi-node-driver-registrar: v2.7.0
+csi-resizer: v1.7.0
+csi-provisioner: v3.4.0
+csi-snapshotter: v6.2.1
+csi-attacher: v4.1.0
+rook-ceph: v1.10.11
+ceph: v17.2.5

@@ -8,15 +8,6 @@ spec:
   replicated:
     size: 3
     requireSafeReplicaSize: true
-  parameters:
-    compression_mode: none
-  mirroring:
-    enabled: false
-    mode: image
-  statusCheck:
-    mirror:
-      disabled: false
-      interval: 60s
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass

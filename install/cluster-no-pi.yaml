@@ -18,7 +18,7 @@ spec:
     count: 2
     allowMultiplePerNode: false
     modules:
-    - name: pg_autoscaler
+    - name: rook
       enabled: true
 
   dashboard:
@@ -32,6 +32,7 @@ spec:
         enabled: false
       compression:
         enabled: false
+      requireMsgr2: false
   crashCollector:
     disable: false
   logCollector:
@@ -39,6 +40,7 @@ spec:
     periodicity: daily
     maxLogSize: 500M
   cleanupPolicy:
+    confirmation: ""
     sanitizeDisks:
       method: quick
       dataSource: zero
@@ -60,6 +62,7 @@ spec:
       - key: storage-node
         operator: Exists
   annotations:
+  labels:
   resources:
     mgr:
       limits:
@@ -101,8 +104,11 @@ spec:
   disruptionManagement:
     managePodBudgets: true
     osdMaintenanceTimeout: 30
-    manageMachineDisruptionBudgets: false
-    machineDisruptionBudgetNamespace: openshift-machine-api
+    pgHealthCheckTimeout: 0
+  csi:
+    readAffinity:
+      enabled: true
+      cephfs:
   healthCheck:
     daemonHealth:
       mon:

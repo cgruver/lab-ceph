@@ -83,19 +83,27 @@ supplementalGroups:
 # The type of volumes which are mounted to csi pods
 volumes:
   - configMap
-  - projected
   - emptyDir
   - hostPath
+  - projected
 users:
   # A user needs to be added for each rook service account.
   # This assumes running in the default sample "rook-ceph" namespace.
   # If other namespaces or service accounts are configured, they need to be updated here.
+  # Service accounts for the cephcsi driver (pre-cephcsi operator)
   - system:serviceaccount:rook-ceph:rook-csi-rbd-plugin-sa # serviceaccount:namespace:operator
   - system:serviceaccount:rook-ceph:rook-csi-rbd-provisioner-sa # serviceaccount:namespace:operator
   - system:serviceaccount:rook-ceph:rook-csi-cephfs-plugin-sa # serviceaccount:namespace:operator
   - system:serviceaccount:rook-ceph:rook-csi-cephfs-provisioner-sa # serviceaccount:namespace:operator
   - system:serviceaccount:rook-ceph:rook-csi-nfs-plugin-sa # serviceaccount:namespace:operator
   - system:serviceaccount:rook-ceph:rook-csi-nfs-provisioner-sa # serviceaccount:namespace:operator
+  # Service accounts for the csi operator
+  - system:serviceaccount:rook-ceph:ceph-csi-cephfs-ctrlplugin-sa # serviceaccount:namespace:operator
+  - system:serviceaccount:rook-ceph:ceph-csi-cephfs-nodeplugin-sa # serviceaccount:namespace:operator
+  - system:serviceaccount:rook-ceph:ceph-csi-nfs-ctrlplugin-sa # serviceaccount:namespace:operator
+  - system:serviceaccount:rook-ceph:ceph-csi-nfs-nodeplugin-sa # serviceaccount:namespace:operator
+  - system:serviceaccount:rook-ceph:ceph-csi-rbd-ctrlplugin-sa # serviceaccount:namespace:operator
+  - system:serviceaccount:rook-ceph:ceph-csi-rbd-nodeplugin-sa # serviceaccount:namespace:operator
 ---
 # Rook Ceph Operator Config
 # Use this ConfigMap to override operator configurations
@@ -113,6 +121,9 @@ data:
 
   # Allow using loop devices for osds in test clusters.
   ROOK_CEPH_ALLOW_LOOP_DEVICES: "false"
+
+  # Enable CSI Operator
+  ROOK_USE_CSI_OPERATOR: "true"
 
   # Enable the CSI driver.
   # To run the non-default version of the CSI driver, see the override-able image properties in operator.yaml
@@ -138,11 +149,6 @@ data:
   # in some network configurations where the SDN does not provide access to an external cluster or
   # there is significant drop in read/write performance.
   # CSI_ENABLE_HOST_NETWORK: "true"
-
-  # Deprecation note: Rook uses "holder" pods to allow CSI to connect to the multus public network
-  # without needing hosts to the network. Holder pods are being removed. See issue for details:
-  # https://github.com/rook/rook/issues/13055. New Rook deployments should set this to "true".
-  CSI_DISABLE_HOLDER_PODS: "true"
 
   # Set logging level for cephCSI containers maintained by the cephCSI.
   # Supported values from 0 to 5. 0 for general useful logs, 5 for trace level verbosity.
@@ -188,22 +194,18 @@ data:
   # supported values are documented at https://kubernetes-csi.github.io/docs/support-fsgroup.html
   CSI_NFS_FSGROUPPOLICY: "File"
 
-  # (Optional) Allow starting unsupported ceph-csi image
-  ROOK_CSI_ALLOW_UNSUPPORTED_VERSION: "false"
-
   # (Optional) control the host mount of /etc/selinux for csi plugin pods.
   CSI_PLUGIN_ENABLE_SELINUX_HOST_MOUNT: "false"
 
   # The default version of CSI supported by Rook will be started. To change the version
   # of the CSI driver to something other than what is officially supported, change
   # these images to the desired release of the CSI driver.
-
-  ROOK_CSI_CEPH_IMAGE: "${PROXY_REGISTRY}/cephcsi/cephcsi:${CEPH_CSI_VER}"
-  ROOK_CSI_REGISTRAR_IMAGE: "${PROXY_REGISTRY}/sig-storage/csi-node-driver-registrar:${CSI_NODE_DRIVER_REG_VER}"
-  ROOK_CSI_RESIZER_IMAGE: "${PROXY_REGISTRY}/sig-storage/csi-resizer:${CSI_RESIZER_VER}"
-  ROOK_CSI_PROVISIONER_IMAGE: "${PROXY_REGISTRY}/sig-storage/csi-provisioner:${CSI_PROVISIONER_VER}"
-  ROOK_CSI_SNAPSHOTTER_IMAGE: "${PROXY_REGISTRY}/sig-storage/csi-snapshotter:${CSI_SNAPSHOTTER_VER}"
-  ROOK_CSI_ATTACHER_IMAGE: "${PROXY_REGISTRY}/sig-storage/csi-attacher:${CSI_ATTACHER_VER}"
+  ROOK_CSI_CEPH_IMAGE: "quay.io/cephcsi/cephcsi:${CEPH_CSI_VER}"
+  ROOK_CSI_REGISTRAR_IMAGE: "registry.k8s.io/sig-storage/csi-node-driver-registrar:${CSI_NODE_DRIVER_REG_VER}"
+  ROOK_CSI_RESIZER_IMAGE: "registry.k8s.io/sig-storage/csi-resizer:${CSI_RESIZER_VER}"
+  ROOK_CSI_PROVISIONER_IMAGE: "registry.k8s.io/sig-storage/csi-provisioner:${CSI_PROVISIONER_VER}"
+  ROOK_CSI_SNAPSHOTTER_IMAGE: "registry.k8s.io/sig-storage/csi-snapshotter:${CSI_SNAPSHOTTER_VER}"
+  ROOK_CSI_ATTACHER_IMAGE: "registry.k8s.io/sig-storage/csi-attacher:${CSI_ATTACHER_VER}"
 
   # (Optional) set user created priorityclassName for csi plugin pods.
   CSI_PLUGIN_PRIORITY_CLASSNAME: "system-node-critical"
@@ -550,6 +552,12 @@ data:
   # Custom prefix value for the OBC provisioner instead of ceph cluster namespace, do not set on existing cluster
   # ROOK_OBC_PROVISIONER_NAME_PREFIX: "custom-prefix"
 
+  # Many OBC additional config fields may be risky for administrators to allow users control over.
+  # The safe and default-allowed fields are 'maxObjects' and 'maxSize'.
+  # Other fields should be considered risky. To allow all additional configs, use this value:
+  #   "maxObjects,maxSize,bucketMaxObjects,bucketMaxSize,bucketPolicy,bucketLifecycle,bucketOwner"
+  # ROOK_OBC_ALLOW_ADDITIONAL_CONFIG_FIELDS: "maxObjects,maxSize" # default allowed configs
+
   # Whether to start the discovery daemon to watch for raw storage devices on nodes in the cluster.
   # This daemon does not need to run if you are only going to create your OSDs based on StorageClassDeviceSets with PVCs.
   ROOK_ENABLE_DISCOVERY_DAEMON: "false"
@@ -559,7 +567,7 @@ data:
   CSI_ENABLE_CSIADDONS: "false"
   # Enable watch for faster recovery from rbd rwo node loss
   ROOK_WATCH_FOR_NODE_FAILURE: "true"
-  # ROOK_CSIADDONS_IMAGE: "quay.io/csiaddons/k8s-sidecar:v0.8.0"
+  # ROOK_CSIADDONS_IMAGE: "quay.io/csiaddons/k8s-sidecar:v0.13.0"
   # The GCSI RPC timeout value (in seconds). It should be >= 120. If this variable is not set or is an invalid value, it's default to 150.
   CSI_GRPC_TIMEOUT_SECONDS: "150"
 
@@ -574,6 +582,9 @@ data:
   # NOTE: the value here serves as an example and needs to be
   # updated with node labels that define domains of interest
   # CSI_TOPOLOGY_DOMAIN_LABELS: "kubernetes.io/hostname,topology.kubernetes.io/zone,topology.rook.io/rack"
+
+  # Enable cross namespace volume data source provisioning.
+  CSI_ENABLE_CROSS_NAMESPACE_VOLUME_DATA_SOURCE: "false"
 
   # Whether to skip any attach operation altogether for CephCSI PVCs.
   # See more details [here](https://kubernetes-csi.github.io/docs/skip-attach.html#skip-attach-with-csi-driver-object).
@@ -633,6 +644,18 @@ data:
   #       requests:
   #         cpu: 200m
   #         memory: 128Mi
+
+  # (Optional) Burst to use while communicating with the kubernetes apiserver.
+  # CSI_KUBE_API_BURST: "10"
+
+  # (Optional) QPS to use while communicating with the kubernetes apiserver.
+  # CSI_KUBE_API_QPS: "5.0"
+
+  # Whether to create all Rook pods to run on the host network, for example in environments where a CNI is not enabled
+  ROOK_ENFORCE_HOST_NETWORK: "false"
+
+  # RevisionHistoryLimit value for all deployments created by rook.
+  # ROOK_REVISION_HISTORY_LIMIT: "3"
 ---
 # The deployment for the rook operator
 # OLM: BEGIN OPERATOR DEPLOYMENT
@@ -668,7 +691,7 @@ spec:
       serviceAccountName: rook-ceph-system
       containers:
         - name: rook-ceph-operator
-          image: ${PROXY_REGISTRY}/rook/ceph:${ROOK_CEPH_VER}
+          image: rook/ceph:${ROOK_CEPH_VER}
           args: ["ceph", "operator"]
           securityContext:
             runAsNonRoot: true
@@ -683,7 +706,7 @@ spec:
             - name: ROOK_CURRENT_NAMESPACE_ONLY
               value: "false"
 
-            # Whether to start pods as privileged that mount a host path, which includes the Ceph mon and osd pods.
+            # Whether to start pods as privileged that mount a host path, which includes the Ceph mon, osd pods and csi provisioners(if logrotation is on).
             # Set this to true if SELinux is enabled (e.g. OpenShift) to workaround the anyuid issues.
             # For more details see https://github.com/rook/rook/issues/1314#issuecomment-355799641
             - name: ROOK_HOSTPATH_REQUIRES_PRIVILEGED
@@ -750,6 +773,10 @@ spec:
           #  Uncomment it to run lib bucket provisioner in multithreaded mode
           #- name: LIB_BUCKET_PROVISIONER_THREADS
           #  value: "5"
+
+      # Uncomment these two settings to run the operator on the host network
+      # hostNetwork: true
+      # dnsPolicy: ClusterFirstWithHostNet
 
       volumes:
         - name: rook-config
